@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2023-11-14">
+
+<title>Netflix Stock Prediction</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="probability_files/libs/clipboard/clipboard.min.js"></script>
+<script src="probability_files/libs/quarto-html/quarto.js"></script>
+<script src="probability_files/libs/quarto-html/popper.min.js"></script>
+<script src="probability_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="probability_files/libs/quarto-html/anchor.min.js"></script>
+<link href="probability_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="probability_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="probability_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="probability_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="probability_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Netflix Stock Prediction</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">November 14, 2023</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<p>This blog provides a comprehensive demonstration of loading, visualizing, and analyzing time-series data in Python. It also illustrates the implementation of a Monte Carlo simulation for stock price prediction. The script showcases how to evaluate the model’s performance and generate plots depicting the best and worst predictions.</p>
+<p>The Monte Carlo simulation, employed in this context, is a method for estimating the future behavior of a system by running numerous simulations with random inputs and analyzing the distribution of the results. Specifically, the script utilizes the Monte Carlo simulation to estimate future prices of Netflix’s stock based on its historical price data.</p>
+<section id="importing-libraries" class="level1">
+<h1>Importing Libraries</h1>
+<p>The script begins by importing a variety of essential libraries, each serving a specific purpose. NumPy is utilized for numerical operations, Pandas for data manipulation and analysis, Plotly for interactive plotting, Seaborn and Matplotlib for statistical data visualization, fbprophet for time series forecasting, pandas_datareader for remote data access, SciPy for scientific computing, scikit-learn (sklearn) for machine learning, and Statsmodels for statistical models. These libraries collectively provide a comprehensive set of tools for tasks ranging from data manipulation and visualization to time series forecasting, machine learning, and statistical modeling.</p>
+<pre class="{code}"><code>import random 
+import numpy as np 
+import pandas as pd 
+import plotly.express as px
+import seaborn as sns
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import matplotlib.ticker as ticker
+import plotly.figure_factory as ff
+from fbprophet import Prophet
+from pandas_datareader import data
+from scipy import stats
+from sklearn.metrics import mean_absolute_error
+from statsmodels.tsa.seasonal import seasonal_decompose
+from sklearn.preprocessing import MinMaxScaler
+from matplotlib.ticker import FixedFormatter, FixedLocator</code></pre>
+</section>
+<section id="exploring-dataset-and-visualization" class="level1">
+<h1>Exploring Dataset and Visualization</h1>
+<p>The script begins by reading a CSV file containing Netflix’s stock prices into a Pandas DataFrame. Following this, it displays the column names of the DataFrame. Subsequently, the script creates a plot illustrating the volume of Netflix’s stock against the date. Additionally, it generates a histogram of the closing prices of Netflix’s stock, accompanied by vertical lines indicating the mean, median, and mode of the closing prices. These visualizations provide insights into the distribution and trends within the stock data.</p>
+<pre class="{code}"><code>path = "../datasets/NFLX.csv"
+prices_train = pd.read_csv(path)
+pd.DataFrame(prices_train.columns, columns=["name"])
+</code></pre>
+<p><img class="img-fluid" src="D:\Project\Final\images\nf_info.png" width="30%"></p>
+<pre class="{code}"><code>fig = px.bar(prices_train, x='Date', y='Volume')
+fig.update_layout(title=f'Netflix stock price', barmode='stack', font_color="black")
+fig.show()</code></pre>
+<p><img class="img-fluid" src="D:\Project\Final\images\nf1.png" width="30%"></p>
+<pre class="{code}"><code>f, (ax1) = plt.subplots(1, 1, figsize=(14, 5))
+v_dist_1 = prices_train["Close"].values
+sns.histplot(v_dist_1, ax=ax1, kde=True)
+mean=prices_train["Close"].mean()
+median=prices_train["Close"].median()
+mode=prices_train["Close"].mode().values[0]
+ax1.axvline(mean, color='r', linestyle='--', label="Mean")
+ax1.axvline(median, color='g', linestyle='-', label="Mean")
+ax1.axvline(mode, color='b', linestyle='-', label="Mode")
+ax1.legend()</code></pre>
+<p><img class="img-fluid" src="D:\Project\Final\images\nf2.png" width="40%"></p>
+</section>
+<section id="monte-carlo-simulation" class="level1">
+<h1>Monte Carlo simulation</h1>
+<p>Prepare the data for Monte Carlo simulation.</p>
+<p>In this section of the script, the data is prepared for the Monte Carlo simulation. This involves calculating the daily returns of the closing prices, determining the drift (which represents the average daily return adjusted for variance), and generating random variables for the simulation. These steps are crucial for setting up the Monte Carlo simulation, where random future scenarios are generated based on historical data to estimate potential future stock prices.</p>
+<pre class="{code}"><code>days_prev_len = 20
+
+prices_train_copy = prices_train["Close"]
+print(f"Before: {len(prices_train_copy)}")
+
+prices_train_copy = prices_train_copy[0: len(prices_train_copy) - days_prev_len]
+prices_test_copy = prices_train_copy[len(prices_train_copy) - days_prev_len:]
+print(f"After: {len(prices_train_copy)}")
+print(f"Test dt: {len(prices_test_copy)}")
+prices_train_copy = np.log(1 + prices_train_copy.pct_change())
+prices_train_copy.fillna(0, inplace=True)
+prices_train_copy
+drift = prices_train_copy.mean() - (0.5 * prices_train_copy.var())
+print(f"Drift: {drift}")
+simulations = 200
+Z = stats.norm.ppf(np.random.rand(days_prev_len, simulations))</code></pre>
+<p>Run the Monte Carlo simulation.</p>
+<p>The script proceeds to execute the Monte Carlo simulation. It involves calculating daily returns for each day and each simulation, then determining stock prices for each day and each simulation based on these daily returns. Finally, the script plots the simulated stock prices, providing a visual representation of the potential future trajectories of Netflix’s stock based on the Monte Carlo simulation.</p>
+<pre class="{code}"><code>def get_plot_simulation(predictions: list):
+    fig = px.line(title = 'Monte Carlo Simulation')
+    for i in range(len(predictions.T)):
+        fig.add_scatter(y = predictions.T[i], name = i)
+    fig.update_layout(paper_bgcolor='white', plot_bgcolor="white", font_color="black")
+    fig.show()
+
+df_std = prices_train_copy.std()
+days_rt = np.exp(drift + df_std * Z)
+days_pred = np.zeros_like(days_rt)
+days_pred[0] = prices_train["Close"].iloc[-1]
+
+for i in range(1, days_prev_len):
+    days_pred[i] = days_pred[i - 1] * days_rt[i]
+get_plot_simulation(days_pred)</code></pre>
+<p><img class="img-fluid" src="D:\Project\Final\images\MCS.png" width="40%"></p>
+<p>Evaluate the model.</p>
+<p>Following the Monte Carlo simulation, the script calculates the mean absolute error of the model’s predictions on the test data for each simulation. Subsequently, it plots the prediction with the smallest error and the prediction with the largest error alongside the actual test data. This visual representation helps in assessing the model’s performance by showcasing the predictions with the best and worst accuracy in comparison to the actual test data.</p>
+<pre class="{code}"><code>s = days_pred.T[0][0:len(prices_test_copy)]
+
+prices_test_copy = prices_test_copy[0:days_prev_len]
+mean_absolute_error(prices_test_copy, s)
+
+sqerror = list()
+for i in range(len(days_pred.T)):
+    sqerror.append(mean_absolute_error(prices_test_copy, days_pred.T[i][0:days_prev_len]))
+def plot_best_predict(df: dict, index_max: int, index_min: int):
+    fig = px.line(title='Predict Simulation - Monte Carlo', markers=True)
+    fig.add_scatter(y=df, name='value')
+    fig.add_scatter(y=days_pred.T[index_max], name='biggest pred error')
+    fig.add_scatter(y=days_pred.T[index_min], name='smallest pred error')
+    fig.update_traces(mode='markers+lines')
+    fig.update_layout(paper_bgcolor='white', plot_bgcolor="white", font_color="black")
+    fig.show()
+
+index_min = np.argmin(sqerror)
+index_max = np.argmax(sqerror)
+plot_best_predict(prices_test_copy, index_max, index_min)</code></pre>
+<p><img class="img-fluid" src="D:\Project\Final\images\MCModel.png" width="40%"></p>
+</section>
+<section id="conclusion" class="level1">
+<h1>Conclusion</h1>
+<p>The script employs the Monte Carlo simulation to estimate future prices of Netflix’s stock based on historical prices. In this context, the assumption is made that the daily returns of the stock follow a log-normal distribution. The historical mean and standard deviation of the daily returns are then used to generate random daily returns for the simulation. This approach allows for the creation of multiple potential future scenarios, capturing the inherent uncertainty in stock price movements.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

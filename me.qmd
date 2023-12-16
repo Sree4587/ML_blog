@@ -1,0 +1,20 @@
+---
+title: "About"
+image: sreenath.jpg
+about:
+  template: jolla
+  links:
+    - icon: linkedin
+      text: LinkedIn
+      href: https://www.linkedin.com/in/sreenath-k/
+    - icon: instagram
+      text: instagram
+      href: https://github.com/sreenaaaath
+    - icon: mail
+      text: mail
+      href: thisissreenath@gmail.com
+---
+
+Electrical engineering professional with master's degree from Virginia Tech. Interested in the semiconductor industry. Backed with 6 months of industrial and over 3 years of academic experience in project management, cross-functional teams, and leadership. Skilled in coordinating projects and working in a fast-paced environment. 
+
+

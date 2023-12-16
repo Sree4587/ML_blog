@@ -1,0 +1,17 @@
+project:
+  type: website
+  output-dir: docs
+
+
+website:
+  title: "Machine Learning"
+  
+  navbar:
+    right:
+      - me.qmd
+      - icon: linkedin
+        href: www.linkedin.com/in/sreenath-k
+format:
+  html:
+    theme: solar
+    css: styles.css

@@ -1,0 +1,14 @@
+<link rel="stylesheet" href="styles.css">
+
+# Sreenath Krishnan Potty
+Electrical engineering professional with master's degree from Virginia Tech. Interested in the semiconductor industry. Backed with 6 months of industrial and over 3 years of academic experience in project management, cross-functional teams, and leadership. Skilled in coordinating projects and working in a fast-paced environment. 
+
+# Machine Learning Blog
+The following are my blog posts on machine learning:
+
+1. [Clustering of Shopping Data with K-means Clustering](clustering.html)
+2. [Heart Disease Classification and Prediction using KNN Mode](classification.html)
+3. [Linear Progression](linear.html)
+4. [Non-Linear Progression](nonlinear.html)
+5. [Time Series Anomaly Detection](anomaly.html)
+6. [Netflix Stock Prediction](probability.html)

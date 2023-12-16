@@ -1,0 +1,148 @@
+---
+title: "Netflix Stock Prediction"
+date: 2023-11-14
+output:
+    quarto::quarto_paper:
+        toc: true
+        number_sections: true
+---
+
+This blog provides a comprehensive demonstration of loading, visualizing, and analyzing time-series data in Python. It also illustrates the implementation of a Monte Carlo simulation for stock price prediction. The script showcases how to evaluate the model's performance and generate plots depicting the best and worst predictions.
+
+The Monte Carlo simulation, employed in this context, is a method for estimating the future behavior of a system by running numerous simulations with random inputs and analyzing the distribution of the results. Specifically, the script utilizes the Monte Carlo simulation to estimate future prices of Netflix's stock based on its historical price data.
+
+# Importing Libraries
+
+The script begins by importing a variety of essential libraries, each serving a specific purpose. NumPy is utilized for numerical operations, Pandas for data manipulation and analysis, Plotly for interactive plotting, Seaborn and Matplotlib for statistical data visualization, fbprophet for time series forecasting, pandas_datareader for remote data access, SciPy for scientific computing, scikit-learn (sklearn) for machine learning, and Statsmodels for statistical models. These libraries collectively provide a comprehensive set of tools for tasks ranging from data manipulation and visualization to time series forecasting, machine learning, and statistical modeling.
+
+```{code}
+import random 
+import numpy as np 
+import pandas as pd 
+import plotly.express as px
+import seaborn as sns
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import matplotlib.ticker as ticker
+import plotly.figure_factory as ff
+from fbprophet import Prophet
+from pandas_datareader import data
+from scipy import stats
+from sklearn.metrics import mean_absolute_error
+from statsmodels.tsa.seasonal import seasonal_decompose
+from sklearn.preprocessing import MinMaxScaler
+from matplotlib.ticker import FixedFormatter, FixedLocator
+```
+
+# Exploring Dataset and Visualization
+
+The script begins by reading a CSV file containing Netflix's stock prices into a Pandas DataFrame. Following this, it displays the column names of the DataFrame. Subsequently, the script creates a plot illustrating the volume of Netflix's stock against the date. Additionally, it generates a histogram of the closing prices of Netflix's stock, accompanied by vertical lines indicating the mean, median, and mode of the closing prices. These visualizations provide insights into the distribution and trends within the stock data.
+
+```{code}
+path = "../datasets/NFLX.csv"
+prices_train = pd.read_csv(path)
+pd.DataFrame(prices_train.columns, columns=["name"])
+
+```
+<img class="img-fluid" src="D:\Project\Final\images\nf_info.png" width= "30%" >
+
+```{code}
+fig = px.bar(prices_train, x='Date', y='Volume')
+fig.update_layout(title=f'Netflix stock price', barmode='stack', font_color="black")
+fig.show()
+```
+<img class="img-fluid" src="D:\Project\Final\images\nf1.png" width= "30%" >
+
+```{code}
+f, (ax1) = plt.subplots(1, 1, figsize=(14, 5))
+v_dist_1 = prices_train["Close"].values
+sns.histplot(v_dist_1, ax=ax1, kde=True)
+mean=prices_train["Close"].mean()
+median=prices_train["Close"].median()
+mode=prices_train["Close"].mode().values[0]
+ax1.axvline(mean, color='r', linestyle='--', label="Mean")
+ax1.axvline(median, color='g', linestyle='-', label="Mean")
+ax1.axvline(mode, color='b', linestyle='-', label="Mode")
+ax1.legend()
+```
+<img class="img-fluid" src="D:\Project\Final\images\nf2.png" width= "40%" >
+
+# Monte Carlo simulation
+
+Prepare the data for Monte Carlo simulation.
+
+In this section of the script, the data is prepared for the Monte Carlo simulation. This involves calculating the daily returns of the closing prices, determining the drift (which represents the average daily return adjusted for variance), and generating random variables for the simulation. These steps are crucial for setting up the Monte Carlo simulation, where random future scenarios are generated based on historical data to estimate potential future stock prices.
+
+```{code}
+days_prev_len = 20
+
+prices_train_copy = prices_train["Close"]
+print(f"Before: {len(prices_train_copy)}")
+
+prices_train_copy = prices_train_copy[0: len(prices_train_copy) - days_prev_len]
+prices_test_copy = prices_train_copy[len(prices_train_copy) - days_prev_len:]
+print(f"After: {len(prices_train_copy)}")
+print(f"Test dt: {len(prices_test_copy)}")
+prices_train_copy = np.log(1 + prices_train_copy.pct_change())
+prices_train_copy.fillna(0, inplace=True)
+prices_train_copy
+drift = prices_train_copy.mean() - (0.5 * prices_train_copy.var())
+print(f"Drift: {drift}")
+simulations = 200
+Z = stats.norm.ppf(np.random.rand(days_prev_len, simulations))
+```
+
+Run the Monte Carlo simulation. 
+
+The script proceeds to execute the Monte Carlo simulation. It involves calculating daily returns for each day and each simulation, then determining stock prices for each day and each simulation based on these daily returns. Finally, the script plots the simulated stock prices, providing a visual representation of the potential future trajectories of Netflix's stock based on the Monte Carlo simulation.
+
+```{code}
+def get_plot_simulation(predictions: list):
+    fig = px.line(title = 'Monte Carlo Simulation')
+    for i in range(len(predictions.T)):
+        fig.add_scatter(y = predictions.T[i], name = i)
+    fig.update_layout(paper_bgcolor='white', plot_bgcolor="white", font_color="black")
+    fig.show()
+
+df_std = prices_train_copy.std()
+days_rt = np.exp(drift + df_std * Z)
+days_pred = np.zeros_like(days_rt)
+days_pred[0] = prices_train["Close"].iloc[-1]
+
+for i in range(1, days_prev_len):
+    days_pred[i] = days_pred[i - 1] * days_rt[i]
+get_plot_simulation(days_pred)
+```
+
+<img class="img-fluid" src="D:\Project\Final\images\MCS.png" width= "40%" >
+
+Evaluate the model.
+
+Following the Monte Carlo simulation, the script calculates the mean absolute error of the model's predictions on the test data for each simulation. Subsequently, it plots the prediction with the smallest error and the prediction with the largest error alongside the actual test data. This visual representation helps in assessing the model's performance by showcasing the predictions with the best and worst accuracy in comparison to the actual test data.
+
+```{code}
+s = days_pred.T[0][0:len(prices_test_copy)]
+
+prices_test_copy = prices_test_copy[0:days_prev_len]
+mean_absolute_error(prices_test_copy, s)
+
+sqerror = list()
+for i in range(len(days_pred.T)):
+    sqerror.append(mean_absolute_error(prices_test_copy, days_pred.T[i][0:days_prev_len]))
+def plot_best_predict(df: dict, index_max: int, index_min: int):
+    fig = px.line(title='Predict Simulation - Monte Carlo', markers=True)
+    fig.add_scatter(y=df, name='value')
+    fig.add_scatter(y=days_pred.T[index_max], name='biggest pred error')
+    fig.add_scatter(y=days_pred.T[index_min], name='smallest pred error')
+    fig.update_traces(mode='markers+lines')
+    fig.update_layout(paper_bgcolor='white', plot_bgcolor="white", font_color="black")
+    fig.show()
+
+index_min = np.argmin(sqerror)
+index_max = np.argmax(sqerror)
+plot_best_predict(prices_test_copy, index_max, index_min)
+```
+<img class="img-fluid" src="D:\Project\Final\images\MCModel.png" width= "40%" >
+
+# Conclusion
+The script employs the Monte Carlo simulation to estimate future prices of Netflix's stock based on historical prices. In this context, the assumption is made that the daily returns of the stock follow a log-normal distribution. The historical mean and standard deviation of the daily returns are then used to generate random daily returns for the simulation. This approach allows for the creation of multiple potential future scenarios, capturing the inherent uncertainty in stock price movements.
